@@ -1,0 +1,29 @@
+{
+  "checks": {
+    "goal_unchanged": true,
+    "old_records_unchanged": true,
+    "old_thumbnail_unchanged": true,
+    "record_count": true,
+    "record_shape": true,
+    "record_attributes": true,
+    "named_output_matches_wall": true,
+    "image_digest": true,
+    "valid_png_dimensions": true,
+    "jpeg_magic_and_size": true,
+    "jpeg_dimensions": true,
+    "scope": true,
+    "new_files_under_limit": true,
+    "named_outputs_untracked": true,
+    "offline_tests": true,
+    "live_endpoint_agreement": true
+  },
+  "offline_test_command": "python3 -B line-4/tools/erc20-transfer-window/test_transfer_window.py",
+  "offline_test_output": "test_boundary_log_hash_mismatch_is_error (__main__.CaptureTests.test_boundary_log_hash_mismatch_is_error) ... ok\ntest_capture_pins_decimals_and_retains_evidence (__main__.CaptureTests.test_capture_pins_decimals_and_retains_evidence) ... ok\ntest_empty_result_is_success_but_invalid_or_wrong_chain_is_error (__main__.CaptureTests.test_empty_result_is_success_but_invalid_or_wrong_chain_is_error) ... ok\ntest_invalid_cli_ranges_do_not_network (__main__.CaptureTests.test_invalid_cli_ranges_do_not_network) ... ok\ntest_reorg_at_either_boundary_is_error (__main__.CaptureTests.test_reorg_at_either_boundary_is_error) ... ok\ntest_conflicting_duplicate_and_block_identity (__main__.TransferTests.test_conflicting_duplicate_and_block_identity) ... ok\ntest_decimal_and_hex_block_arguments (__main__.TransferTests.test_decimal_and_hex_block_arguments) ... ok\ntest_exact_unit_rendering (__main__.TransferTests.test_exact_unit_rendering) ... ok\ntest_gathering_findings_and_malformed_fields_are_rejected (__main__.TransferTests.test_gathering_findings_and_malformed_fields_are_rejected) ... ok\ntest_limit_does_not_truncate (__main__.TransferTests.test_limit_does_not_truncate) ... ok\ntest_real_logs_exact_values_sort_and_deduplication (__main__.TransferTests.test_real_logs_exact_values_sort_and_deduplication) ... ok\ntest_invalid_envelopes_are_controlled_errors (__main__.TransportTests.test_invalid_envelopes_are_controlled_errors) ... ok\ntest_nonread_methods_and_credential_endpoints_never_network (__main__.TransportTests.test_nonread_methods_and_credential_endpoints_never_network) ... ok\ntest_response_limit_and_network_error (__main__.TransportTests.test_response_limit_and_network_error) ... ok\ntest_valid_envelope_user_agent_and_read_method (__main__.TransportTests.test_valid_envelope_user_agent_and_read_method) ... ok\n\n----------------------------------------------------------------------\nRan 15 tests in 0.011s\n\nOK\n",
+  "live_capture_at": "2026-10-12T15:32:50Z",
+  "live_range": [
+    26177298,
+    26177309
+  ],
+  "live_transfer_count": 3,
+  "wall_sha256": "a1dc2f27657c77cd75466d478bcbe08776d574d4a74fe938678c821bc73a6086"
+}

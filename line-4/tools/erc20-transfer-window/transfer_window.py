@@ -8,9 +8,11 @@ signs, sends, or serializes a transaction.
 import argparse
 import datetime as dt
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
+import urllib.parse
 
 
 TOKENS = {
@@ -20,8 +22,12 @@ TOKENS = {
 DEFAULT_RPC = "https://ethereum-rpc.publicnode.com"
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 DECIMALS_CALL = "0x313ce567"
-USER_AGENT = "Pepeolithic-ERC20-Transfer-Window/1.0 (read-only public data)"
+USER_AGENT = "Pepeolithic-ERC20-Transfer-Window/2.0 (read-only public data)"
 MAX_WINDOW = 2_000
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+MAX_LOGS = 20_000
+READ_METHODS = frozenset({"eth_chainId", "eth_blockNumber", "eth_call", "eth_getLogs", "eth_getBlockByNumber"})
+HEX_QUANTITY = re.compile(r"0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})\Z")
 
 
 class RpcError(RuntimeError):
@@ -30,6 +36,9 @@ class RpcError(RuntimeError):
 
 def rpc(endpoint, method, params):
     """Perform one JSON-RPC request, returning its result or raising RpcError."""
+    if method not in READ_METHODS:
+        raise RpcError("method is not an allowed public read")
+    validate_endpoint(endpoint)
     body = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
         separators=(",", ":"),
@@ -42,9 +51,16 @@ def rpc(endpoint, method, params):
     )
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+            raw = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise RpcError("RPC response exceeds byte limit; use a smaller window")
+            payload = json.loads(raw.decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError) as exc:
         raise RpcError("network or JSON failure: {}".format(exc)) from exc
+    if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0":
+        raise RpcError("RPC response is not a JSON-RPC 2.0 object")
+    if type(payload.get("id")) is not int or payload["id"] != 1:
+        raise RpcError("RPC response ID does not match request")
     if "error" in payload:
         raise RpcError("RPC error: {}".format(payload["error"]))
     if "result" not in payload:
@@ -55,11 +71,13 @@ def rpc(endpoint, method, params):
 def parse_block(value):
     """Accept a non-negative decimal or 0x-prefixed block number."""
     try:
-        number = int(value, 0)
+        number = int(value, 16 if value.lower().startswith("0x") else 10)
     except ValueError as exc:
         raise argparse.ArgumentTypeError("block must be decimal or 0x-prefixed") from exc
     if number < 0:
         raise argparse.ArgumentTypeError("block must not be negative")
+    if number >= 2**256:
+        raise argparse.ArgumentTypeError("block must fit an unsigned 256-bit quantity")
     return number
 
 
@@ -67,10 +85,37 @@ def as_quantity(number):
     return hex(number)
 
 
+def validate_endpoint(endpoint):
+    try:
+        parts = urllib.parse.urlsplit(endpoint)
+        if (parts.scheme != "https" or not parts.hostname or parts.username is not None
+                or parts.password is not None or parts.query or parts.fragment):
+            raise ValueError("public HTTPS endpoint without credentials/query/fragment required")
+        if parts.port is not None and not 1 <= parts.port <= 65535:
+            raise ValueError("invalid port")
+    except ValueError as exc:
+        raise RpcError("invalid RPC endpoint: {}".format(exc)) from exc
+
+
+def quantity(value, name):
+    if not isinstance(value, str) or HEX_QUANTITY.fullmatch(value) is None:
+        raise RpcError("{} must be a canonical hex quantity".format(name))
+    return int(value, 16)
+
+
+def hex_bytes(value, size, name):
+    if (not isinstance(value, str) or len(value) != 2 + 2 * size
+            or not value.startswith("0x")
+            or re.fullmatch(r"[0-9a-fA-F]+", value[2:]) is None):
+        raise RpcError("{} must contain exactly {} hex bytes".format(name, size))
+    return value.lower()
+
+
 def topic_address(topic):
-    if not isinstance(topic, str) or len(topic) != 66 or not topic.startswith("0x"):
-        raise RpcError("unexpected indexed address topic")
-    return "0x" + topic[-40:].lower()
+    topic = hex_bytes(topic, 32, "indexed address topic")
+    if topic[2:26] != "0" * 24:
+        raise RpcError("indexed address topic has nonzero ABI padding")
+    return "0x" + topic[-40:]
 
 
 def display_units(raw, decimals):
@@ -83,26 +128,74 @@ def display_units(raw, decimals):
     return "{}.{}".format(str(whole), str(fraction).zfill(decimals).rstrip("0"))
 
 
-def decode_log(log, decimals):
+def decode_log(log, decimals, token_address=TOKENS["zto"], from_block=None, to_block=None):
+    """Validate one mined ERC-20 log before interpreting any of its values."""
+    if not isinstance(log, dict):
+        raise RpcError("Transfer log is not an object")
+    if log.get("removed") is not False:
+        raise RpcError("Transfer log is removed or has no explicit removed=false")
+    emitter = hex_bytes(log.get("address"), 20, "log emitter")
+    if emitter != token_address.lower():
+        raise RpcError("Transfer log has the wrong emitter")
     topics = log.get("topics")
-    data = log.get("data")
-    if not isinstance(topics, list) or len(topics) != 3 or not isinstance(data, str):
-        raise RpcError("unexpected Transfer log shape")
-    try:
-        raw_value = int(data, 16)
-        block = int(log["blockNumber"], 16)
-        index = int(log["logIndex"], 16)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise RpcError("unexpected numeric Transfer log field") from exc
+    if not isinstance(topics, list) or len(topics) != 3:
+        raise RpcError("Transfer event requires exactly three topics")
+    if hex_bytes(topics[0], 32, "event signature") != TRANSFER_TOPIC:
+        raise RpcError("Transfer log has the wrong event signature")
+    raw_value = int(hex_bytes(log.get("data"), 32, "Transfer uint256 data"), 16)
+    block = quantity(log.get("blockNumber"), "blockNumber")
+    index = quantity(log.get("logIndex"), "logIndex")
+    transaction_index = quantity(log.get("transactionIndex"), "transactionIndex")
+    if ((from_block is not None and block < from_block)
+            or (to_block is not None and block > to_block)):
+        raise RpcError("Transfer log is outside the requested inclusive range")
     return {
         "block": block,
+        "block_hash": hex_bytes(log.get("blockHash"), 32, "blockHash"),
         "log_index": index,
-        "transaction_hash": log.get("transactionHash"),
+        "transaction_index": transaction_index,
+        "transaction_hash": hex_bytes(log.get("transactionHash"), 32, "transactionHash"),
         "from": topic_address(topics[1]),
         "to": topic_address(topics[2]),
         "raw_value": str(raw_value),
         "value": display_units(raw_value, decimals),
     }
+
+
+def validate_logs(logs, decimals, token_address, from_block, to_block):
+    if not isinstance(logs, list):
+        raise RpcError("eth_getLogs result is not a list")
+    if len(logs) > MAX_LOGS:
+        raise RpcError("too many logs; use a smaller window (no truncation performed)")
+    unique = {}
+    block_hashes = {}
+    slots = {}
+    duplicates = 0
+    for log in logs:
+        item = decode_log(log, decimals, token_address, from_block, to_block)
+        block, block_hash = item["block"], item["block_hash"]
+        if block in block_hashes and block_hashes[block] != block_hash:
+            raise RpcError("logs disagree on the hash of one block")
+        block_hashes[block] = block_hash
+        key = (block_hash, item["transaction_hash"], item["log_index"])
+        slot = (block, item["log_index"])
+        if slot in slots and slots[slot] != key:
+            raise RpcError("conflicting events occupy the same block/log index")
+        slots[slot] = key
+        if key in unique:
+            if item != unique[key]:
+                raise RpcError("duplicate identity contains conflicting Transfer fields")
+            duplicates += 1
+        else:
+            unique[key] = item
+    return sorted(unique.values(), key=lambda item: (item["block"], item["log_index"])), duplicates
+
+
+def block_anchor(endpoint, number):
+    block = rpc(endpoint, "eth_getBlockByNumber", [hex(number), False])
+    if not isinstance(block, dict) or quantity(block.get("number"), "anchor block number") != number:
+        raise RpcError("requested anchor block is unavailable or has the wrong number")
+    return {"number": number, "hash": hex_bytes(block.get("hash"), 32, "anchor block hash")}
 
 
 def arguments(argv):
@@ -127,19 +220,24 @@ def arguments(argv):
 def main(argv=None):
     args = arguments(argv)
     token_address = TOKENS[args.token]
-    head = int(rpc(args.rpc, "eth_blockNumber", []), 16)
+    validate_endpoint(args.rpc)
+    chain_id = quantity(rpc(args.rpc, "eth_chainId", []), "chain ID")
+    if chain_id != 1:
+        raise RpcError("Ethereum mainnet (chain ID 1) is required")
+    head = quantity(rpc(args.rpc, "eth_blockNumber", []), "chain head")
     if args.from_block is None:
         to_block = head
         from_block = max(0, head - args.latest_window + 1)
     else:
         from_block, to_block = args.from_block, args.to_block
-    decimals_result = rpc(args.rpc, "eth_call", [{"to": token_address, "data": DECIMALS_CALL}, "latest"])
-    try:
-        decimals = int(decimals_result, 16)
-    except (TypeError, ValueError) as exc:
-        raise RpcError("token decimals() result is not a hex integer") from exc
+    if to_block > head:
+        raise RpcError("requested range extends beyond the observed chain head")
+    start_anchor = block_anchor(args.rpc, from_block)
+    end_anchor = start_anchor if to_block == from_block else block_anchor(args.rpc, to_block)
+    decimals_result = rpc(args.rpc, "eth_call", [{"to": token_address, "data": DECIMALS_CALL}, hex(to_block)])
+    decimals = int(hex_bytes(decimals_result, 32, "decimals() ABI result"), 16)
     if decimals > 255:
-        raise RpcError("token decimals() result is implausibly large")
+        raise RpcError("token decimals() result exceeds uint8")
     filter_object = {
         "address": token_address,
         "fromBlock": as_quantity(from_block),
@@ -147,13 +245,28 @@ def main(argv=None):
         "topics": [TRANSFER_TOPIC],
     }
     logs = rpc(args.rpc, "eth_getLogs", [filter_object])
-    if not isinstance(logs, list):
-        raise RpcError("eth_getLogs result is not a list")
-    transfers = [decode_log(log, decimals) for log in logs]
-    transfers.sort(key=lambda item: (item["block"], item["log_index"]))
+    transfers, duplicates = validate_logs(logs, decimals, token_address, from_block, to_block)
+    for anchor in (start_anchor, end_anchor):
+        for item in transfers:
+            if item["block"] == anchor["number"] and item["block_hash"] != anchor["hash"]:
+                raise RpcError("Transfer log disagrees with a boundary block hash")
+    # Re-read both boundaries after decimals/logs to detect a reorg during capture.
+    if block_anchor(args.rpc, from_block) != start_anchor:
+        raise RpcError("start block changed during capture; retry")
+    if to_block != from_block and block_anchor(args.rpc, to_block) != end_anchor:
+        raise RpcError("end block changed during capture; retry")
     output = {
         "captured_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "read_only": True,
+        "schema_version": 2,
+        "chain_id": chain_id,
+        "from_block_anchor": start_anchor,
+        "to_block_anchor": end_anchor,
+        "decimals_block": to_block,
+        "raw_logs": logs,
+        "duplicate_count": duplicates,
+        "provider_result": "validated",
+        "limitations": "Single-provider observation; not a completeness or finality proof. Interior block hashes are retained but not independently verified.",
         "rpc": args.rpc,
         "token": args.token.upper(),
         "token_address": token_address,

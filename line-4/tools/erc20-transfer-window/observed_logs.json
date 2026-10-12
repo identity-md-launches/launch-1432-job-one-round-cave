@@ -1,0 +1,49 @@
+{
+  "source": "gathering/checks/live-crosscheck.json, dRPC raw response",
+  "captured_at": "2026-10-12T14:11:02.553530+00:00",
+  "endpoint": "https://eth.drpc.org",
+  "params": [
+    {
+      "address": "0xd782bdea4ef02a0bd391eb9089470c8080f0a68e",
+      "fromBlock": "0x18f6d4c",
+      "toBlock": "0x18f6d57",
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+      ]
+    }
+  ],
+  "logs": [
+    {
+      "address": "0xd782bdea4ef02a0bd391eb9089470c8080f0a68e",
+      "blockHash": "0x7d770b4f73ca9107cffdbaf656be52beed4e41871c6cc9ccee2fe617c04f9bfe",
+      "blockNumber": "0x18f6d55",
+      "blockTimestamp": "0x6acce803",
+      "data": "0x0000000000000000000000000000000000000000000066ca7d7f959be1e2aaab",
+      "logIndex": "0x263",
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x00000000000000000000000062f6d9b24e5433d8e23b7d3dbd06467fb8ca7d75",
+        "0x000000000000000000000000000000000000000000000000000000000000dead"
+      ],
+      "transactionHash": "0xa9c323beae12a52b720118b8b9a31c9fa988796b5e0517e38a92ea9497d2b25d",
+      "transactionIndex": "0xa8"
+    },
+    {
+      "address": "0xd782bdea4ef02a0bd391eb9089470c8080f0a68e",
+      "blockHash": "0xb1f6cce177c36968154d09c7cde9d3586dd69968a1a4fac00a4248aa62160d87",
+      "blockNumber": "0x18f6d56",
+      "blockTimestamp": "0x6acce80f",
+      "data": "0x00000000000000000000000000000000000000000000a28c4e916b74b3421ffa",
+      "logIndex": "0x226",
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000000000000004444c5dc75cb358380d2e3de08a90",
+        "0x000000000000000000000000a0eeed7ad4e74912069fe16a3c3d94d2d9425c25"
+      ],
+      "transactionHash": "0xb8281063fd5330af1d7a9980c3288f29ee49a27dc0cdc0963e7da0c8730336c1",
+      "transactionIndex": "0xed"
+    }
+  ]
+}

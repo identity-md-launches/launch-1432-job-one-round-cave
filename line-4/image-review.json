@@ -1,0 +1,28 @@
+{
+  "wall_paths": [
+    "artifacts/line-4/wall.png",
+    "artifacts/line-4/wall-v2.png"
+  ],
+  "wall_dimensions": [
+    1254,
+    1254
+  ],
+  "wall_format": "PNG",
+  "wall_mode": "RGB",
+  "jpeg_path": "dist/line-4/22.jpg",
+  "jpeg_dimensions": [
+    512,
+    512
+  ],
+  "jpeg_format": "JPEG",
+  "jpeg_bytes": 73430,
+  "ancestor_sha256": "da7df3ed310ce393f0748eaee581cc3b623ab512e7ff1ef6abfe42e1be6760c2",
+  "new_mark_rectangle": [
+    230,
+    180,
+    415,
+    360
+  ],
+  "ancestor_pixels_outside_rectangle": "identical, asserted before publication",
+  "unmet_visual_requirements": []
+}
