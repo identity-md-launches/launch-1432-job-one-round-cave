@@ -3,62 +3,70 @@
 import json
 import sys
 
+MAX_TRANSACTION_BYTES = 128 * 1024
+MAX_RLP_DEPTH = 16
+MAX_RLP_ITEMS = 16384
+
 ZTO = "0xd782bdea4ef02a0bd391eb9089470c8080f0a68e"
 
 
 def rlp_item(data, position=0):
-    """Return (an RLP byte string or list, next_position), rejecting non-canonical data."""
-    if position >= len(data):
-        raise ValueError("truncated RLP item")
-    first = data[position]
-    if first < 0x80:
-        return bytes([first]), position + 1
-    if first <= 0xb7:
-        size = first - 0x80
-        start = position + 1
+    """Parse one canonical RLP item with bounded nesting, items and input bytes.
+
+    Each child is restricted to its parent's payload: a child may never consume
+    bytes belonging to a following sibling or outside the enclosing list.
+    """
+    if not isinstance(data, bytes) or len(data) > MAX_TRANSACTION_BYTES:
+        raise ValueError("RLP input must be bytes within the 128 KiB limit")
+    if not isinstance(position, int) or position < 0:
+        raise ValueError("invalid RLP position")
+    budget = [MAX_RLP_ITEMS]
+
+    def parse(cursor, limit, depth):
+        if depth > MAX_RLP_DEPTH:
+            raise ValueError("RLP nesting exceeds depth limit")
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise ValueError("RLP item count exceeds limit")
+        if cursor >= limit:
+            raise ValueError("truncated RLP item")
+        first = data[cursor]
+        if first < 0x80:
+            return data[cursor:cursor + 1], cursor + 1
+        is_list = first >= 0xc0
+        short_base = 0xc0 if is_list else 0x80
+        long_base = 0xf7 if is_list else 0xb7
+        start = cursor + 1
+        if first <= long_base:
+            size = first - short_base
+        else:
+            length_size = first - long_base
+            length_end = start + length_size
+            if length_end > limit or data[start] == 0:
+                raise ValueError("non-canonical or truncated RLP length")
+            size = int.from_bytes(data[start:length_end], "big")
+            if size < 56:
+                raise ValueError("non-canonical long RLP length")
+            start = length_end
         end = start + size
-        if end > len(data) or (size == 1 and data[start] < 0x80):
-            raise ValueError("non-canonical or truncated RLP string")
-        return data[start:end], end
-    if first <= 0xbf:
-        length_size = first - 0xb7
-        start = position + 1
-        end = start + length_size
-        if end > len(data) or data[start] == 0:
-            raise ValueError("non-canonical or truncated RLP length")
-        size = int.from_bytes(data[start:end], "big")
-        body = end + size
-        if size < 56 or body > len(data):
-            raise ValueError("non-canonical or truncated RLP string")
-        return data[end:body], body
-    if first <= 0xf7:
-        size = first - 0xc0
-        start = position + 1
-        end = start + size
-    else:
-        length_size = first - 0xf7
-        start = position + 1
-        end = start + length_size
-        if end > len(data) or data[start] == 0:
-            raise ValueError("non-canonical or truncated RLP length")
-        size = int.from_bytes(data[start:end], "big")
-        if size < 56:
-            raise ValueError("non-canonical RLP list")
-        end += size
-    if end > len(data):
-        raise ValueError("truncated RLP list")
-    values = []
-    cursor = start if first <= 0xf7 else position + 1 + length_size
-    while cursor < end:
-        value, cursor = rlp_item(data, cursor)
-        values.append(value)
-    if cursor != end:
-        raise ValueError("malformed RLP list")
-    return values, end
+        if end > limit:
+            raise ValueError("truncated RLP payload")
+        if not is_list:
+            if size == 1 and data[start] < 0x80:
+                raise ValueError("non-canonical RLP string")
+            return data[start:end], end
+        values = []
+        cursor = start
+        while cursor < end:
+            value, cursor = parse(cursor, end, depth + 1)
+            values.append(value)
+        return values, end
+
+    return parse(position, len(data), 0)
 
 
 def integer(value, name):
-    if not isinstance(value, bytes) or (len(value) > 1 and value[0] == 0):
+    if not isinstance(value, bytes) or (value and value[0] == 0):
         raise ValueError(f"invalid {name}")
     return int.from_bytes(value, "big")
 
@@ -96,14 +104,22 @@ def access_list(value):
 
 
 def decode(transaction_hex):
+    if not isinstance(transaction_hex, str):
+        raise ValueError("transaction must be hexadecimal text")
+    if len(transaction_hex) > 2 * MAX_TRANSACTION_BYTES + 2:
+        raise ValueError("transaction exceeds the 128 KiB limit")
     if transaction_hex.startswith("0x"):
         transaction_hex = transaction_hex[2:]
     if len(transaction_hex) % 2 or not transaction_hex:
         raise ValueError("transaction must be non-empty, even-length hexadecimal")
+    if any(character not in "0123456789abcdefABCDEF" for character in transaction_hex):
+        raise ValueError("transaction is not hexadecimal (whitespace is not allowed)")
     try:
         raw = bytes.fromhex(transaction_hex)
     except ValueError as error:
         raise ValueError("transaction is not hexadecimal") from error
+    if len(raw) > MAX_TRANSACTION_BYTES:
+        raise ValueError("transaction exceeds the 128 KiB limit")
     if raw[0] != 2:
         raise ValueError("only EIP-1559 typed transactions (0x02) are supported")
     fields, end = rlp_item(raw, 1)
@@ -145,4 +161,8 @@ def main(arguments):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
