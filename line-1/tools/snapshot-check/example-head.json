@@ -1,0 +1,7 @@
+{
+  "captured_at": "2026-10-12T15:03:17Z",
+  "endpoint": "https://ethereum-rpc.publicnode.com",
+  "method": "eth_blockNumber",
+  "params": [],
+  "result": "0x18f6e8b"
+}

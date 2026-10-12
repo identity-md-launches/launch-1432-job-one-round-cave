@@ -1,0 +1,33 @@
+{
+  "round": 22,
+  "checks": "passed",
+  "offline_regressions": 6,
+  "live_reads": [
+    "Ethereum head",
+    "ZTO totalSupply"
+  ],
+  "wall": {
+    "paths": [
+      "artifacts/line-1/wall.png",
+      "artifacts/line-1/wall-v2.png"
+    ],
+    "width": 1254,
+    "height": 1254,
+    "format": "PNG RGB 8-bit",
+    "sha256": "c975b31febcd537b65187a2a00d545d5610683c140f90adad6b6b98384d57eba"
+  },
+  "thumbnail": {
+    "path": "dist/line-1/22.jpg",
+    "width": 512,
+    "height": 512,
+    "format": "JPEG baseline",
+    "bytes": 70474
+  },
+  "visual_review": {
+    "unmet_requirements": [],
+    "ancestor_hands": "five digits each, unchanged",
+    "preservation": "all pixels outside vacant-rock insert unchanged"
+  },
+  "goal_unchanged": true,
+  "older_records_unchanged": true
+}
