@@ -1,1 +1,30 @@
-{"name":"Not painted yet","image":"https://api.imd.fun/artifacts/9cbb7bb2a41efa92e010921f287819c9ffb02c4375fa9496c8468701d8e00cc5","attributes":[{"trait_type":"Cave","value":"Base"}]}
+{
+  "name": "Torch Before the Seal",
+  "image": "https://api.imd.fun/artifacts/e53d77dac9c1762b895aa8bff66ab138eff44e9e5cca68fac531718ffef31857",
+  "attributes": [
+    {
+      "trait_type": "Cave",
+      "value": "Base"
+    },
+    {
+      "trait_type": "Wall",
+      "value": "Gathering"
+    },
+    {
+      "trait_type": "Number",
+      "value": 2
+    },
+    {
+      "trait_type": "Left behind",
+      "value": "Tx preflight"
+    },
+    {
+      "trait_type": "Meaning",
+      "value": "A torch lights an unsealed scroll tied to its stone, read before anyone seals it."
+    },
+    {
+      "trait_type": "One thing",
+      "value": "Gathering"
+    }
+  ]
+}

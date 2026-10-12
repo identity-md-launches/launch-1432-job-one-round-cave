@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline structural checks for gathering 01; never writes or uses the network."""
+"""Offline structural checks for gathering 02; never writes or uses the network."""
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -71,6 +71,20 @@ def jpeg_dimensions(data):
     raise AssertionError("missing JPEG dimensions")
 
 
+PLACEHOLDER = {"name": "Not painted yet", "image": "https://api.imd.fun/artifacts/9cbb7bb2a41efa92e010921f287819c9ffb02c4375fa9496c8468701d8e00cc5", "attributes": [{"trait_type": "Cave", "value": "Base"}]}
+TRAITS = ["Cave", "Wall", "Number", "Left behind", "Meaning", "One thing"]
+
+
+def check_painted(obj, wall, number):
+    assert set(obj) == {"name", "image", "attributes"}
+    assert obj["image"].startswith("https://api.imd.fun/artifacts/")
+    attrs = obj["attributes"]
+    assert [a["trait_type"] for a in attrs] == TRAITS
+    assert all(set(a) == {"trait_type", "value"} for a in attrs)
+    assert attrs[0]["value"] == "Base" and attrs[1]["value"] == wall
+    assert type(attrs[2]["value"]) is int and attrs[2]["value"] == number
+
+
 def main():
     root = Path(".")
     baseline = json.loads(Path("gathering/line-source-hashes.json").read_text())
@@ -80,36 +94,38 @@ def main():
     goals = json.loads(Path("dist/goals.json").read_text())
     assert goals == [{"line": n, "goal": Path(f"line-{n}/GOAL.md").read_text().strip()}
                      for n in range(1,5)]
-    png = Path("artifacts/gathering/wall.png").read_bytes()
-    jpg = Path("dist/gathering/01.jpg").read_bytes()
+    png = Path("artifacts/gathering/wall-v2.png").read_bytes()
+    assert Path("artifacts/gathering/wall.png").read_bytes() == png
+    jpg = Path("dist/gathering/02.jpg").read_bytes()
     assert png_dimensions(png) == (1254,1254)
     assert jpeg_dimensions(jpg) == (512,512)
-    record = json.loads(Path("dist/gathering/01.json").read_text())
-    assert set(record) == {"name", "image", "attributes"}
+    record = json.loads(Path("dist/gathering/02.json").read_text())
+    check_painted(record, "Gathering", 2)
     assert record["image"] == "https://api.imd.fun/artifacts/" + hashlib.sha256(png).hexdigest()
     attrs = record["attributes"]
-    expected_names = ["Cave", "Wall", "Number", "Left behind", "Meaning", "One thing"]
-    assert [a["trait_type"] for a in attrs] == expected_names
-    assert all(set(a) == {"trait_type", "value"} for a in attrs)
-    assert [a["value"] for a in attrs[:3]] == ["Base", "Gathering", 1]
-    assert type(attrs[2]["value"]) is int and attrs[-1]["value"] == "Gathering"
+    assert attrs[-1]["value"] == "Gathering"
     assert all(isinstance(a["value"], str) and a["value"] for a in attrs if a["trait_type"] != "Number")
-    placeholder = {"name": "Not painted yet", "image": "https://api.imd.fun/artifacts/9cbb7bb2a41efa92e010921f287819c9ffb02c4375fa9496c8468701d8e00cc5", "attributes": [{"trait_type": "Cave", "value": "Base"}]}
     walls = ["line-1", "line-2", "line-3", "line-4", "gathering"]
-    records = []
+    records, painted, placeholders = [], 0, 0
     for wall in walls:
-        for number in range(1,22):
-            path = Path(f"dist/{wall}/{number:02d}.json")
+        label = "Gathering" if wall == "gathering" else "Line " + wall[-1]
+        for path in sorted(Path(f"dist/{wall}").glob("[0-9][0-9].json")):
             obj = json.loads(path.read_text())
             records.append(path.relative_to("dist").as_posix())
-            if number > 1:
-                assert obj == placeholder
+            if obj == PLACEHOLDER:
+                placeholders += 1
                 assert not path.with_suffix(".jpg").exists()
+            else:
+                painted += 1
+                check_painted(obj, label, int(path.stem))
+                assert path.with_suffix(".jpg").is_file()
+        for number in range(1, 22):
+            assert Path(f"dist/{wall}/{number:02d}.json").is_file()
     gallery = Gallery()
     gallery.feed(Path("dist/index.html").read_text())
     assert gallery.sections == walls
     assert set(records) <= set(gallery.links)
-    assert len(gallery.images) == len(records) == 105
+    assert len(gallery.images) == len(records)
     assert not gallery.external_code
     for numbers in gallery.order.values(): assert numbers == sorted(numbers, reverse=True)
     for src in gallery.images:
@@ -118,12 +134,15 @@ def main():
         for path in Path(directory).rglob("*"):
             assert not path.is_symlink()
             if path.is_file(): assert path.stat().st_size <= 100000, str(path)
+            if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+                assert directory == "dist" and path.suffix == ".jpg", str(path)
     assert Path("gathering/COINS.md").read_text().splitlines()[0] == "none"
     assert not Path("gathering/coin-order.json").exists()
     assert not Path("gathering/deploy-order.json").exists()
     print(json.dumps({"passed": True, "line_files_unchanged": len(actual), "goals": 4,
-                      "records": len(records), "placeholders": 100, "png": "1254x1254 RGB",
-                      "jpeg": "512x512 baseline color", "wall_sha256": hashlib.sha256(png).hexdigest(),
+                      "records": len(records), "painted": painted, "placeholders": placeholders,
+                      "png": "1254x1254 RGB", "jpeg": "512x512 baseline color",
+                      "wall_sha256": hashlib.sha256(png).hexdigest(),
                       "visual_review": "See gathering/README.md; not certified by this checker."}, indent=2))
 
 

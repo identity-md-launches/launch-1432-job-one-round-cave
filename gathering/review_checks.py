@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Offline regression observations for the first gathering; no network calls.
+"""Offline regression observations from gathering 01, updated for the round-22
+line interfaces in gathering 02; no network calls.
 
 Prints JSON; exit 1 means known producer defects remain, 0 means all checks pass.
 Run from workspace root: python3 -B gathering/review_checks.py
@@ -31,7 +32,7 @@ def run():
     class Reply:
         def __enter__(self): return self
         def __exit__(self, *args): pass
-        def read(self): return b"null"
+        def read(self, *limit): return b"null"
     original_open = snapshot.urllib.request.urlopen
     original_argv = sys.argv
     snapshot.urllib.request.urlopen = lambda *args, **kwargs: Reply()
@@ -65,7 +66,9 @@ def run():
                            "0x" + "0"*24 + event["to"][2:]],
                 "data": "0x" + format(int(event["raw_value"]), "064x"),
                 "blockNumber": hex(event["block"]), "logIndex": hex(event["log_index"]),
-                "transactionHash": event["transaction_hash"], "removed": False}
+                "transactionHash": event["transaction_hash"], "removed": False,
+                # Round-22 decoder also requires these identity fields.
+                "blockHash": "0x" + "ab"*32, "transactionIndex": "0x0"}
     cases = {
         "wrong emitter": {"address": window.TOKENS["imd"]},
         "wrong topic": {"topics": ["0x" + "ff"*32] + original["topics"][1:]},
@@ -80,7 +83,9 @@ def run():
         log.update(changes)
         logs = [log, copy.deepcopy(log)] if name == "duplicate log" else [log]
         def fake_rpc(endpoint, method, params):
+            if method == "eth_chainId": return "0x1"
             if method == "eth_blockNumber": return hex(source["head_at_capture"])
+            if method == "eth_getBlockByNumber": return {"number": params[0], "hash": original["blockHash"]}
             if method == "eth_call": return "0x" + format(18, "064x")
             if method == "eth_getLogs": return logs
             raise AssertionError("Unexpected method: " + method)
