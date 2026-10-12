@@ -1,0 +1,51 @@
+{
+  "dimensions": [
+    1254,
+    1254
+  ],
+  "format": "PNG",
+  "mode": "RGB",
+  "png_bytes": 3925219,
+  "sha256": "f0a9380166244daf5b0487fcb6c9e7d129879add000deb83522e75030069ee62",
+  "thumbnail_dimensions": [
+    512,
+    512
+  ],
+  "thumbnail_format": "JPEG",
+  "thumbnail_bytes": 72936,
+  "addition_patch": [
+    755,
+    325,
+    1030,
+    590
+  ],
+  "unchanged_pixels_outside_patch": true,
+  "unmet_visual_requirements": [],
+  "ancestor_record": "dist/line-2/01.json",
+  "ancestor_sha256": "1c6892a0acda91c3238807a28c915990eb4e6a78bf4aebfe16dd92ab59be0b8c",
+  "wall_paths": [
+    "artifacts/line-2/wall.png",
+    "artifacts/line-2/wall-v2.png"
+  ],
+  "thumbnail_path": "dist/line-2/22.jpg",
+  "generator": "built-in image_gen.imagegen edit",
+  "preservation": "Retained only the generated addition on bare rock; blended its 12-pixel boundary; copied all ancestor pixels outside the addition patch.",
+  "manual_review": {
+    "pepe_identity": "Inherited broad mouth and heavy-lidded eyes retained",
+    "digits_per_visible_hand": [
+      5,
+      5
+    ],
+    "new_hands_or_handprints": 0,
+    "pigments": [
+      "charcoal",
+      "red ochre",
+      "yellow ochre",
+      "bare stone"
+    ],
+    "prohibited_marks_observed": false,
+    "unmet_visual_requirements": []
+  },
+  "limitations": "Local visual review is not independent certification; generated rock inside the small addition patch is not pixel-identical to the ancestor.",
+  "generation_prompt": "Use case: precise-object-edit. Edit the supplied existing cave-wall PNG, preserving the original 1254 by 1254 square dimensions. The attached image is the edit target, not an inspiration. Preserve ALL existing marks exactly: the large recognizable Pepe frog with heavy-lidded eyes, wide mouth, five-digit hands (four fingers and one thumb), ochre body, feet, and cord-bound bundle must not be erased, moved, recoloured, cleaned, replaced or redrawn. Preserve the entire rock, all fissures, light, torchlit warm colour and original framing. Add just one modest new painting to previously unpainted rock in the upper-right central open area, above the existing bundle and to the right of Pepe's head, approximately x=830..1040, y=310..550. The new mark is an uneven charcoal watching eye above a small cord-bound ochre bundle enclosed by an incomplete rough oval of small charcoal pebbles, to evoke careful inspection within a finite boundary. Keep it small and subordinate to the original Pepe. Render the addition as hand-made, weathered Lascaux/Chauvet cave pigment rubbed into the stone: only charcoal black, red/yellow ochre, chalk white, bare rock showing through. No additional frog or hands. Change only the small addition area, preserve all other pixels as closely as possible. No letters, numbers, captions, signatures, logos, watermarks, borders, frames, political or hateful symbols; no glossy digital art, no 3D rendering. Save this completed PNG in the workspace at artifacts/line-2/wall-v2.png if output control is available."
+}
